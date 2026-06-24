@@ -1,0 +1,54 @@
+Task ID: 20260624_202230
+Language: HTML/CSS
+Task Type: Create a simple website
+Output Scope: A basic HTML page with header, main content, and footer
+------------------------------------------------------------
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Website</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+        }
+        header, footer {
+            background-color: #333;
+            color: white;
+            text-align: center;
+            padding: 1em 0;
+        }
+        main {
+            padding: 20px;
+        }
+        h1 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Welcome to Our Simple Website</h1>
+</header>
+
+<main>
+    <p>This is the main content area of our website. Here you can find various sections and information related to our services or products.</p>
+    <!-- Add more content as needed -->
+</main>
+
+<footer>
+    <p>&copy; 2023 Simple Website. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
+```
+
+This HTML page includes a basic structure with a header, main content area, and footer, all styled using CSS for a clean look.

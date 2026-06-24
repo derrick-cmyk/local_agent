@@ -1,0 +1,12 @@
+{
+  "task_id": "20260624_202230",
+  "language": "HTML/CSS",
+  "task_type": "Create a simple website",
+  "output_scope": "A basic HTML page with header, main content, and footer",
+  "existing_code": "None",
+  "constraints": [
+    "No external dependencies or resources needed"
+  ],
+  "user_request": "Make a simple HTML website",
+  "status": "READY_FOR_CODER"
+}
