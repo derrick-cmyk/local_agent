@@ -64,6 +64,7 @@ class BronApp(QMainWindow):
     set_status = Signal(str)               # status bar message
     enable_input = Signal(bool)            # enable/disable input
     store_coder_output = Signal(str)       # update coder output tab
+    update_latest_message = Signal(str)    # append text to Bron's latest message
 
     def __init__(self):
         super().__init__()
@@ -71,10 +72,15 @@ class BronApp(QMainWindow):
         self.resize(950, 650)
 
         # State
+        self.loading = True                 # Prevent auto-saves during startup
+        self.settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.ini")
+        self.settings_obj = QSettings(self.settings_path, QSettings.IniFormat)
+        
         self.messages = []                  # conversation history
         self.processing = False
         self.ollama_connected = False
         self.latest_coder_output = "No coder output yet."
+        self.stop_event = threading.Event()
 
         # Load system memory
         memory_text = load_memory()
@@ -94,6 +100,8 @@ class BronApp(QMainWindow):
         self._update_ollama_status(silent=True)
         if self.ollama_connected:
             self.display_message.emit("System", "Bron is ready. How can I help you?\n")
+        
+        self.loading = False                # Ready for user interaction/saves
 
     # ------------------------------------------------------------------
     # UI Construction
@@ -146,9 +154,18 @@ class BronApp(QMainWindow):
         self.entry.setFont(QFont("Segoe UI", 10))
         self.entry.setMaximumHeight(80)
         input_layout.addWidget(self.entry)
+        btn_layout = QVBoxLayout()
+        self.btn_upload = QPushButton("📄 Upload PDF")
+        self.btn_upload.clicked.connect(self.handle_pdf_upload)
         self.send_btn = QPushButton("Send")
         self.send_btn.clicked.connect(self._on_send)
-        input_layout.addWidget(self.send_btn)
+        self.stop_btn = QPushButton("🛑 Stop")
+        self.stop_btn.clicked.connect(self.on_stop)
+        self.stop_btn.setVisible(False)     # Only show when processing
+        btn_layout.addWidget(self.btn_upload)
+        btn_layout.addWidget(self.send_btn)
+        btn_layout.addWidget(self.stop_btn)
+        input_layout.addLayout(btn_layout)
         splitter.addWidget(input_widget)
         splitter.setSizes([400, 150])
         chat_layout.addWidget(splitter)
@@ -198,6 +215,16 @@ class BronApp(QMainWindow):
         self.btn_refresh_models.clicked.connect(self._populate_models)
         model_layout.addRow(self.btn_refresh_models)
         settings_layout.addWidget(model_group)
+
+        # PDF processing group
+        pdf_group = QGroupBox("PDF Processing")
+        pdf_layout = QFormLayout(pdf_group)
+        from PySide6.QtWidgets import QSpinBox
+        self.spin_pdf_limit = QSpinBox()
+        self.spin_pdf_limit.setRange(1, 999)
+        self.spin_pdf_limit.setValue(50)
+        pdf_layout.addRow("Page reading limit:", self.spin_pdf_limit)
+        settings_layout.addWidget(pdf_group)
 
         # Logging group
         log_group = QGroupBox("Logging")
@@ -273,6 +300,13 @@ class BronApp(QMainWindow):
         self.set_status.connect(self._on_set_status)
         self.enable_input.connect(self._on_enable_input)
         self.store_coder_output.connect(self._on_store_coder_output)
+        self.update_latest_message.connect(self._on_update_latest_message)
+        
+        # Auto-save connections
+        self.orch_combo.currentTextChanged.connect(self._save_settings)
+        self.coder_combo.currentTextChanged.connect(self._save_settings)
+        self.chk_verbose.stateChanged.connect(self._save_settings)
+        self.spin_pdf_limit.valueChanged.connect(self._save_settings)
 
     # ------------------------------------------------------------------
     # Theme management
@@ -344,12 +378,11 @@ class BronApp(QMainWindow):
     # Settings persistence
     # ------------------------------------------------------------------
     def _load_settings(self):
-        settings = QSettings("BronAssistant", "GUI")
-        self.current_theme = settings.value("theme", "dark")
+        self.current_theme = self.settings_obj.value("theme", "dark")
         self._apply_theme(self.current_theme)
 
         # Restore verbose
-        verbose_val = settings.value("verbose", False)
+        verbose_val = self.settings_obj.value("verbose", False)
         # Handle string "true"/"false" from ini files
         if isinstance(verbose_val, str):
             verbose_val = verbose_val.lower() == "true"
@@ -357,16 +390,19 @@ class BronApp(QMainWindow):
 
         # Restore models
         try:
-            self.orch_combo.setCurrentText(settings.value("orch_model", ORCHESTRATOR_MODEL))
+            self.orch_combo.setCurrentText(self.settings_obj.value("orch_model", ORCHESTRATOR_MODEL))
         except:
             self.orch_combo.setCurrentText(ORCHESTRATOR_MODEL)
         try:
-            self.coder_combo.setCurrentText(settings.value("coder_model", CODER_MODEL))
+            self.coder_combo.setCurrentText(self.settings_obj.value("coder_model", CODER_MODEL))
         except:
             self.coder_combo.setCurrentText(CODER_MODEL)
 
+        # Restore PDF limit
+        self.spin_pdf_limit.setValue(int(self.settings_obj.value("pdf_page_limit", 50)))
+
         # Restore window geometry
-        geom = settings.value("geometry")
+        geom = self.settings_obj.value("geometry")
         if geom:
             self.restoreGeometry(geom)
 
@@ -374,12 +410,14 @@ class BronApp(QMainWindow):
         self._populate_models()
 
     def _save_settings(self):
-        settings = QSettings("BronAssistant", "GUI")
-        settings.setValue("theme", self.current_theme)
-        settings.setValue("orch_model", self.orch_combo.currentText().strip())
-        settings.setValue("coder_model", self.coder_combo.currentText().strip())
-        settings.setValue("verbose", self.chk_verbose.isChecked())
-        settings.setValue("geometry", self.saveGeometry())
+        if self.loading:
+            return
+        self.settings_obj.setValue("theme", self.current_theme)
+        self.settings_obj.setValue("orch_model", self.orch_combo.currentText().strip())
+        self.settings_obj.setValue("coder_model", self.coder_combo.currentText().strip())
+        self.settings_obj.setValue("verbose", self.chk_verbose.isChecked())
+        self.settings_obj.setValue("pdf_page_limit", self.spin_pdf_limit.value())
+        self.settings_obj.setValue("geometry", self.saveGeometry())
 
     # ------------------------------------------------------------------
     # Ollama connection and model management
@@ -464,7 +502,14 @@ class BronApp(QMainWindow):
     # Slots for thread‑safe GUI updates
     # ------------------------------------------------------------------
     def _on_display_message(self, sender: str, text: str):
-        self.chat_display.append(f"{sender}: {text}")
+        self.chat_display.append(f"<b>{sender}</b>: {text}")
+
+    def _on_update_latest_message(self, text: str):
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        cursor.insertText(text)
+        self.chat_display.setTextCursor(cursor)
+        self.chat_display.ensureCursorVisible()
 
     def _on_set_status(self, text: str):
         self.status_bar.showMessage(text)
@@ -472,12 +517,64 @@ class BronApp(QMainWindow):
     def _on_enable_input(self, enabled: bool):
         self.entry.setEnabled(enabled)
         self.send_btn.setEnabled(enabled)
+        self.stop_btn.setVisible(not enabled) # Show stop only when busy
         if enabled:
             self.entry.setFocus()
 
     def _on_store_coder_output(self, output: str):
         self.latest_coder_output = output
         self.coder_output_display.setPlainText(output)
+
+    # ------------------------------------------------------------------
+    # PDF handling
+    # ------------------------------------------------------------------
+    def handle_pdf_upload(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select PDF", "", "PDF Files (*.pdf)")
+        if file_path:
+            self._print_verbose(f"Uploading PDF: {file_path}")
+            self.set_status.emit("Extracting PDF text...")
+            self.enable_input.emit(False)
+            threading.Thread(target=self.process_pdf_file, args=(file_path,), daemon=True).start()
+
+    def process_pdf_file(self, file_path):
+        try:
+            import PyPDF2
+            text = ""
+            with open(file_path, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                num_pages = len(reader.pages)
+                limit = self.spin_pdf_limit.value()
+                pages_to_read = min(num_pages, limit)
+                
+                if num_pages > limit:
+                    self._print_verbose(f"PDF has {num_pages} pages, limiting to {limit}.")
+                
+                for i in range(pages_to_read):
+                    text += reader.pages[i].extract_text() + "\n"
+            
+            filename = os.path.basename(file_path)
+            
+            # Send notification to UI
+            self.display_message.emit("You", f"Uploaded PDF: {filename}")
+            
+            # Add to memory silently
+            system_msg = f"DOCUMENT PROVIDED: {filename}\nCONTENT:\n{text}"
+            self.messages.append({"role": "system", "content": system_msg})
+            
+            summary_request = f"Please provide a comprehensive summary of the document '{filename}' I just uploaded."
+            
+            # Trigger the standard message flow with increased context (32k)
+            self._process_message(summary_request, num_ctx=32768)
+            
+        except Exception as e:
+            self.display_message.emit("System", f"Failed to read PDF: {e}")
+            self.set_status.emit("Ready")
+            self.enable_input.emit(True)
+
+    def on_stop(self):
+        if self.processing:
+            self._print_verbose("Stop requested by user.")
+            self.stop_event.set()
 
     # ------------------------------------------------------------------
     # Input handling
@@ -502,35 +599,60 @@ class BronApp(QMainWindow):
     # ------------------------------------------------------------------
     # Core agent logic (unchanged from original)
     # ------------------------------------------------------------------
-    def _process_message(self, user_text: str):
+    # Increased default num_ctx to 32768 for better document context retention
+    def _process_message(self, user_text: str, num_ctx=32768):
         try:
-            self._print_verbose("Processing user message...")
+            self.processing = True
+            self.stop_event.clear()
+            self._print_verbose(f"Processing user message (context: {num_ctx})...")
+            
             # Update model choices before call (in case changed)
             import config
             config.ORCHESTRATOR_MODEL = self.orch_combo.currentText().strip()
             config.CODER_MODEL = self.coder_combo.currentText().strip()
             self._print_verbose(f"Set orchestrator to {config.ORCHESTRATOR_MODEL}, coder to {config.CODER_MODEL}")
 
-            self.messages.append({"role": "user", "content": user_text})
-            self.display_message.emit("You", user_text)
+            # Don't append if it was already added by PDF handler
+            if not any(m["role"] == "user" and m["content"] == user_text for m in self.messages[-2:]):
+                self.messages.append({"role": "user", "content": user_text})
+                self.display_message.emit("You", user_text)
 
             self.set_status.emit("Thinking...")
-            self._print_verbose("Calling orchestrator model...")
-            response = chat(self.messages)
-            self._print_verbose("Received orchestrator response.")
-            self.messages.append({"role": "assistant", "content": response})
-            self.display_message.emit("Bron", response)
+            self._print_verbose("Calling orchestrator model (streaming)...")
+            
+            # Start Bron's message block
+            self.display_message.emit("Bron", "")
+            
+            full_response = ""
+            stream = chat(self.messages, stream=True, num_ctx=num_ctx)
+            
+            for chunk in stream:
+                if self.stop_event.is_set():
+                    self._print_verbose("Stream interrupted by stop event.")
+                    full_response += " [CANCELLED]"
+                    self.update_latest_message.emit(" [CANCELLED]")
+                    break
+                
+                token = chunk["message"]["content"]
+                full_response += token
+                self.update_latest_message.emit(token)
 
-            if DUMP_SIGNAL in response:
-                self._handle_coding_task(response)
+            self._print_verbose("Received full orchestrator response.")
+            self.messages.append({"role": "assistant", "content": full_response})
+
+            if not self.stop_event.is_set() and DUMP_SIGNAL in full_response:
+                self._handle_coding_task(full_response, num_ctx=num_ctx)
 
             self._finish_processing()
 
         except Exception as e:
-            self.display_message.emit("System", f"Error: {e}")
+            if self.stop_event.is_set():
+                self._print_verbose("Process interrupted gracefully.")
+            else:
+                self.display_message.emit("System", f"Error: {e}")
             self._finish_processing()
 
-    def _handle_coding_task(self, response: str):
+    def _handle_coding_task(self, response: str, num_ctx=8192):
         self._print_verbose("Coding task signal detected. Preparing dump...")
         self.set_status.emit("Preparing coding task...")
         summary_block = extract_summary_block(response)
@@ -572,7 +694,7 @@ class BronApp(QMainWindow):
 
         self.messages.append({"role": "user", "content": presentation_instruction})
         self.set_status.emit("Generating summary...")
-        summary_response = chat(self.messages)
+        summary_response = chat(self.messages, num_ctx=num_ctx)
         self.messages.append({"role": "assistant", "content": summary_response})
         self.display_message.emit("Bron", summary_response)
 

@@ -20,7 +20,7 @@ def extract_summary_block(response: str) -> str:
     return response[start:end].strip()
 
 
-def run_sub_agent() -> bool:
+def run_sub_agent(coder_model=None) -> bool:
     """
     Invoke the coder sub-agent as a blocking subprocess.
     Returns True on success (exit code 0), False otherwise.
@@ -28,8 +28,8 @@ def run_sub_agent() -> bool:
     print("\n[PIPELINE] Invoking coder sub-agent...")
     
     env = os.environ.copy()
-    if hasattr(config, 'CODER_MODEL'):
-        env['CODER_MODEL'] = config.CODER_MODEL
+    if coder_model:
+        env['CODER_MODEL'] = coder_model
         
     result = subprocess.run(
         [sys.executable, SUB_AGENT_SCRIPT],

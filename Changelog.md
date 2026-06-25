@@ -106,3 +106,21 @@ See `MODELS.md` for:
 - How to add new specialist models (summariser, reviewer, planner, etc.)
 - Routing pattern for directing different task types to different specialists
 - VRAM management between sequential model calls
+
+
+---
+
+## Phase 6 — GUI & PDF Summarization
+
+**Files created:**
+- `brongui3.py` — Gradio-based GUI for the agent; includes file upload for PDF summarization.
+
+**Files modified:**
+- `ollama_client.py` — `chat()` function updated to accept `num_ctx` to increase the model's context window, preventing truncation on large inputs.
+
+**What it does:**
+This phase introduces a Gradio web interface, moving the agent out of the terminal. Key features include:
+- **GUI Interaction:** A user-friendly interface for chatting with the agent.
+- **PDF Summarization:** Users can upload PDF files. The GUI extracts the text and passes it to the orchestrator for summarization.
+- **Increased Context Window:** The context limit (`num_ctx`) for the Ollama model has been significantly increased (to 8,192 by default, and 16,384 for PDF tasks). This allows the agent to process the full text of large documents without truncating the output, fixing an issue where it would only return single-word summaries.
+- **Model Selection Fix:** A bug was fixed where the orchestrator model selected in the GUI was ignored when presenting sub-agent results.

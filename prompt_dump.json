@@ -1,12 +1,13 @@
 {
-  "task_id": "20260624_202230",
-  "language": "HTML/CSS",
-  "task_type": "Create a simple website",
-  "output_scope": "A basic HTML page with header, main content, and footer",
-  "existing_code": "None",
+  "task_id": "20260626_042710",
+  "language": "HTML",
+  "task_type": "scaffold",
+  "output_scope": "single html file",
+  "existing_code": "none",
   "constraints": [
-    "No external dependencies or resources needed"
+    "The website is meant to be a framework for a news website/blog."
   ],
-  "user_request": "Make a simple HTML website",
-  "status": "READY_FOR_CODER"
+  "user_request": "Scaffold a new, self-contained HTML file that serves as the basic framework or template structure for a news website/blog.",
+  "status": "READY_FOR_CODER",
+  "coder_model": "qwen2.5-coder:3b"
 }

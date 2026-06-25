@@ -13,7 +13,7 @@ import ollama
 from config import CODER_MODEL as DEFAULT_CODER_MODEL, CODER_OUTPUT_PATH
 from dump_writer import read_dump
 
-CODER_MODEL = os.environ.get('CODER_MODEL', DEFAULT_CODER_MODEL)
+
 
 
 # ─────────────────────────────────────────────────
@@ -79,6 +79,10 @@ def build_prompt(dump: dict) -> str:
 # ─────────────────────────────────────────────────
 
 def run_coder():
+    # Get model from environment variable (passed by pipeline) or use default from config
+    coder_model = os.environ.get('CODER_MODEL')
+    if not coder_model:
+        coder_model = read_dump().get('coder_model', DEFAULT_CODER_MODEL)
     # Step 1: Read dump
     dump = read_dump()
     if dump is None:
@@ -92,13 +96,13 @@ def run_coder():
     # Step 3: Build prompt
     prompt = build_prompt(dump)
     print("[CODER] Prompt built. Calling coder model...")
-    print(f"[CODER] Model: {CODER_MODEL}")
+    print(f"[CODER] Model: {coder_model}")
     print(f"[CODER] Task: {dump['task_type']} | Scope: {dump['output_scope']} | Lang: {dump['language']}")
 
     # Step 4: Call coder model
     try:
         response = ollama.chat(
-            model=CODER_MODEL,
+            model=coder_model,
             messages=[{"role": "user", "content": prompt}]
         )
         result = response["message"]["content"]

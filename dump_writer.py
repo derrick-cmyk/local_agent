@@ -30,17 +30,20 @@ def parse_task_summary(text: str) -> dict:
         "existing_code": extract("Existing Code"),
         "constraints": constraints,
         "user_request": extract("User Request"),
-        "status": "READY_FOR_CODER"
+        "status": "READY_FOR_CODER",
     }
 
 
-def write_dump(task_summary_text: str) -> bool:
+def write_dump(task_summary_text: str, coder_model: str = None) -> bool:
     """
     Parse the task summary and write it to the prompt dump JSON file.
     Returns True on success, False on failure.
     """
     try:
         data = parse_task_summary(task_summary_text)
+
+        if coder_model:
+            data['coder_model'] = coder_model
 
         # Validate required fields are not empty
         required = ["language", "task_type", "output_scope", "user_request"]
