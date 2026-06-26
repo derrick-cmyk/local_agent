@@ -152,27 +152,40 @@ class BronApp(QMainWindow):
         self.chat_display.setFont(QFont("Consolas", 10))
         splitter.addWidget(self.chat_display)
 
+        # --- Bottom panel (redesigned) ---
         input_widget = QWidget()
         input_layout = QHBoxLayout(input_widget)
         input_layout.setContentsMargins(0, 0, 0, 0)
+        input_layout.setSpacing(5)
+
+        # Text input area
         self.entry = ChatInputEdit(self._on_send)
         self.entry.setFont(QFont("Segoe UI", 10))
-        self.entry.setMaximumHeight(80)
-        input_layout.addWidget(self.entry)
-        btn_layout = QVBoxLayout()
+        self.entry.setMaximumHeight(60)
+
+        # Buttons – always visible, horizontally compact
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(5)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+
         self.btn_upload = QPushButton("📄 Upload PDF")
         self.btn_upload.clicked.connect(self.handle_pdf_upload)
         self.send_btn = QPushButton("Send")
         self.send_btn.clicked.connect(self._on_send)
         self.stop_btn = QPushButton("🛑 Stop")
         self.stop_btn.clicked.connect(self.on_stop)
-        self.stop_btn.setVisible(False)     # Only show when processing
+        self.stop_btn.setEnabled(False)          # Always visible, disabled by default
+
         btn_layout.addWidget(self.btn_upload)
         btn_layout.addWidget(self.send_btn)
         btn_layout.addWidget(self.stop_btn)
+        btn_layout.addStretch()                  # Push buttons left, extra space after them
+
+        input_layout.addWidget(self.entry)
         input_layout.addLayout(btn_layout)
+
         splitter.addWidget(input_widget)
-        splitter.setSizes([400, 150])
+        splitter.setSizes([400, 120])            # Give input a slightly smaller initial height
         chat_layout.addWidget(splitter)
 
         self.content_stack.addWidget(chat_tab)
@@ -769,7 +782,8 @@ class BronApp(QMainWindow):
     def _on_enable_input(self, enabled: bool):
         self.entry.setEnabled(enabled)
         self.send_btn.setEnabled(enabled)
-        self.stop_btn.setVisible(not enabled)
+        # Stop button always visible; enable it only when input is disabled (i.e. processing)
+        self.stop_btn.setEnabled(not enabled)
         if enabled:
             self.entry.setFocus()
 
@@ -962,4 +976,3 @@ if __name__ == "__main__":
     window = BronApp()
     window.show()
     sys.exit(app.exec())
-
